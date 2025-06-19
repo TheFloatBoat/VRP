@@ -292,7 +292,7 @@ def intraRoute(backTripRoute, n_iterations = 1000):
     global bestRoute
     for i in range(n_iterations):
             initialDist, initial1D = calculate2DDistances(backTripRoute, return1D = "True")
-            backTripRouteCopy = backTripRoute.copy()
+            backTripRouteCopy = [trip.copy() for trip in backTripRoute] #Damn --- i never knew that .copy() on a 2D list only creates a copy of the outer list, inner lists are still shared. this is known as a shallow copy (vs deep copy as done here)
             randomNumber = np.random.randint(1, 10*len(backTripRoute))
             randomNumber2 = np.random.randint(1, len(backTripRoute[int(randomNumber/10)])-1)
             randomNumber3 = np.random.randint(1, len(backTripRoute[int(randomNumber/10)])-1)
@@ -300,18 +300,14 @@ def intraRoute(backTripRoute, n_iterations = 1000):
                 randomNumber3 = np.random.randint(1, len(backTripRoute[int(randomNumber/10)])-1)
             if randomNumber2 == randomNumber3:
                 randomNumber3 = np.random.randint(1, len(backTripRoute[int(randomNumber/10)])-1)
-            swappedNode1 = backTripRoute[int(randomNumber/10)][randomNumber2]
-            swappedNode2 = backTripRoute[int(randomNumber/10)][randomNumber3]
-            backTripRoute[int(randomNumber/10)].insert(randomNumber2, swappedNode2)
-            del backTripRoute[int(randomNumber/10)][randomNumber2+1]
-            backTripRoute[int(randomNumber/10)].insert(randomNumber3, swappedNode1)
-            del backTripRoute[int(randomNumber/10)][randomNumber3+1]
+            # Simple swap - no insert/delete needed
+            backTripRoute[int(randomNumber/10)][randomNumber2], backTripRoute[int(randomNumber/10)][randomNumber3] = backTripRoute[int(randomNumber/10)][randomNumber3], backTripRoute[int(randomNumber/10)][randomNumber2]
             finalDist, final1D = calculate2DDistances(backTripRoute, return1D = "True")
-            if initialDist > finalDist:
-                bestRoute = initial1D
-            elif finalDist > initialDist:
-                backTripRoute = backTripRouteCopy #Revert
+            if finalDist < initialDist: 
                 bestRoute = final1D
+            else:  
+                backTripRoute = backTripRouteCopy
+                bestRoute = initial1D
     return backTripRoute
 
 
@@ -322,7 +318,7 @@ def inter_route(backTripRoute):
                 if i == j:
                     continue
                 else:
-                    backTripRouteCopy = backTripRoute.copy()
+                    backTripRouteCopy = [trip.copy() for trip in backTripRoute]
                     initialDist, initial1D = calculate2DDistances(backTripRoute, return1D = "True")
                     swappedRoute1 = backTripRoute[i]
                     swappedRoute2 = backTripRoute[j]
@@ -331,10 +327,10 @@ def inter_route(backTripRoute):
                     backTripRoute.insert(j, swappedRoute1)
                     del backTripRoute[j+1]
                     finalDist, final1D = calculate2DDistances(backTripRoute, return1D = "True")
-                    if initialDist < finalDist:
-                        backTripRoute = backTripRouteCopy
+                    if initialDist > finalDist:
                         bestRoute = final1D
                     else:
+                        backTripRoute = backTripRouteCopy
                         bestRoute = initial1D
     return backTripRoute
 
@@ -349,7 +345,12 @@ def twoOpt(backTripRoute, n_iterations = 1000, strategy = "intra_route"): #Intra
         backTripRoute =inter_route(backTripRoute)
     return backTripRoute
 
-
+def twoDtooneD(twoDRoute):
+    oneDRoute = []
+    for i in range(len(twoDRoute)):
+        for j in range(len(twoDRoute[i])):
+            oneDRoute.append(twoDRoute[i][j])
+    return oneDRoute
 
 #Useful tip: set(list) returns all unique values in list. didnt know lol
 
@@ -566,7 +567,7 @@ def clusterRouted(epsilon, min_samples, noisePoints = "Address", coordinates = d
             except:
                 continue
     print("Nodes Unserviced:", nodesDitched)
-    return {"route": collectiveClusterRoute, "distance": totalRouteDist}
+    return {"route": collectiveClusterRoute, "distance": totalRouteDist},dbscanModel.labels_
          
             #Right now (13/6/25 update) nothing is stopping the algorithm from carrying out nearest neighbour after the first iteration.
             #Things to add/improve:
@@ -575,29 +576,60 @@ def clusterRouted(epsilon, min_samples, noisePoints = "Address", coordinates = d
             #3) Address points that are OUTSIDE of the cluster (noise points) (the category of these points are labelled as -1) (they do not count as a category in nunique)
             #14/6/25 --- DONE! Don't delete this, we need this for our journalling
              
-dict1 = clusterRouted(10, 4, noisePoints="Address", vehicleCapacity=vehicleCapacity)
+dict1, nodeLabelsClustered = clusterRouted(10, 4, noisePoints="Address", vehicleCapacity=vehicleCapacity)
 
 #Plotting out route using matplotlib
-routeX = []
-routeY = []
-nodeLabelListofRoute = []
+def labelClusterOrder(labelsUnordered, dict1= dict1):
+    orderedClusterLabels = []
+    route = dict1.get("route")
+    for node in route:
+        orderedClusterLabels.append(labelsUnordered[node])
+    return orderedClusterLabels
 
+def labelDepots(route):
+    listOut = []
+    for node in route:
+        if node in depotList:
+            listOut.append(0)
+        else:
+            listOut.append(1)
+    return listOut
+    
+def XYSplit(route):
+    X= []
+    Y=[]
+    for point in route:
+        X.append(dataframe.loc[dataframe["NodeNumber"] == point]["X"])
+        Y.append(dataframe.loc[dataframe["NodeNumber"] == point]["Y"])
+    return X, Y
 
-for node in bestRouteNN:
-    if node in depotList:
-        nodeLabelListofRoute.append(0)
-    else:
-        nodeLabelListofRoute.append(1)
+byDepotX, byDepotY = XYSplit(bestRouteNN)
+nodeLabelListofRoute = labelDepots(bestRouteNN)
+plt.figure()
+plt.plot(byDepotX, byDepotY, linestyle='--', color='gray', alpha=0.5)
+plt.scatter(byDepotX, byDepotY, c = nodeLabelListofRoute) #This does not plot the ditched points for dbscan if ignore mode
+plt.title("Path from Nearest Neighbour Algorithm")
+plt.show()
 
-for point in bestRouteNN:
-    routeX.append(dataframe.loc[dataframe["NodeNumber"] == point]["X"])
-    routeY.append(dataframe.loc[dataframe["NodeNumber"] == point]["Y"])
-plt.plot(routeX, routeY, linestyle='--', color='gray', alpha=0.5)
-plt.scatter(routeX, routeY, c = nodeLabelListofRoute) #This does not plot the ditched points for dbscan
+byClusterX, byClusterY = XYSplit(dict1.get("route"))
+orderedClusterLabs = labelClusterOrder(nodeLabelsClustered)
+plt.figure()
+plt.scatter(byClusterX, byClusterY, c = orderedClusterLabs) #This should be the nodes labelled in terms of classification, IN ORDER or route
+plt.plot(byClusterX, byClusterY, linestyle='--', color='gray', alpha=0.5)
+plt.title("Path from DBSCAN Unsupervised Learning")
+plt.show()
+
+optimizedBacktripRoute = twoOpt(backtripRoutes, 2000, "rojak")
+twoOptedX, twoOptedY = XYSplit(twoDtooneD(optimizedBacktripRoute))
+nodeLabelListofRoute2 = labelDepots(twoDtooneD(optimizedBacktripRoute))
+plt.figure()
+plt.plot(twoOptedX, twoOptedY, linestyle='--', color='gray', alpha=0.5)
+plt.scatter(twoOptedX, twoOptedY, c = nodeLabelListofRoute2) #This does not plot the ditched points for dbscan if ignore mode
+plt.title("Path from Nearest Neighbour Algorithm Enhanced by Two Opt")
 plt.show()
 
 
-optimizedBacktripRoute = twoOpt(backtripRoutes, 2000, "rojak")
+
 print(optimizedBacktripRoute)
 print(calculate2DDistances(optimizedBacktripRoute))
 print(nodeCount)
@@ -608,7 +640,7 @@ print(dict1)
 #Challenge to have vehicles serve noise points while transiting from node to depot if on the way.
 #Challenge to try creating a k-opt algorithm? ie 2-way swap, 3-way swap, 4-way swap all customizable by an input parameter.
 
-#Color the nodes by dbscan cluster on a separate scatter plot
+#Color the nodes by dbscan cluster on a separate scatter plot --- DONE!
 
 #Hear me out guys --- I know this code structure is really stupid where there are just some try: x except: literally x with a small data tweak but its actually needed cuz for some reason sometimes python takes a 1x1 piece of data as a number, sometimes it takes it as a pandas series so i have to account for both 
 
