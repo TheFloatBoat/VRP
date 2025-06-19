@@ -400,7 +400,7 @@ def anyDistance(node1, node2):
 
 #Technically this dbscan optimization can also be used as a minimum viable product since it generates a whole route to be  compared with that of NN
 def clusterRouted(epsilon, min_samples, noisePoints = "Address", coordinates = dataframe[["X","Y"]], vehicleCapacity = vehicleCapacity, depotList = depotList, distances = distances):
-    global totalRouteDist #Guys pls dont change this i rlly need this so that an above function can modify an internal variable here
+    global totalRouteDist, vehicleCapacityLeft #Guys pls dont change this i rlly need this so that an above function can modify an internal variable here
     dbscanModel = DBSCAN(eps = epsilon, min_samples= min_samples)
     dbscanModel.fit(coordinates)
     catList = dbscanModel.labels_
@@ -447,6 +447,7 @@ def clusterRouted(epsilon, min_samples, noisePoints = "Address", coordinates = d
             collectiveClusterRoute.append(startDepot)
             collectiveClusterRoute.append(startNode)
             totalRouteDist += distances[startDepot][startNode]
+            vehicleCapacityLeft -= dataframe.loc[dataframe["NodeNumber"] == startNode]["Demand"]
             x = len(coordinates.iloc[[x for x in clusteredList[i]]]) -1
         coordinateSet = dataframe.iloc[[x for x in clusteredList[i]]]
         x = len(coordinateSet)
@@ -461,44 +462,72 @@ def clusterRouted(epsilon, min_samples, noisePoints = "Address", coordinates = d
                     continue
                 if node in clusterVisitLiao:
                     continue
-                if (coordinateSet.loc[coordinateSet["NodeNumber"] == node]["Demand"].values > vehicleCapacityLeft).any():
-                    chooseReturnDepot(currentlyAt, decidedRouteWithBackTrips=collectiveClusterRoute)
-                    currentlyAt = collectiveClusterRoute[-1]
-                    minNodeDist = None
+                
+                node_demand = float(coordinateSet.loc[coordinateSet["NodeNumber"] == node]["Demand"].iloc[0])
+                try:
+                    if (node_demand > vehicleCapacityLeft).any():
+                        chooseReturnDepot(currentlyAt, decidedRouteWithBackTrips=collectiveClusterRoute)
+                        currentlyAt = collectiveClusterRoute[-1]
+                        vehicleCapacityLeft = vehicleCapacity 
+                except:
+                     if node_demand > vehicleCapacityLeft:
+                        chooseReturnDepot(currentlyAt, decidedRouteWithBackTrips=collectiveClusterRoute)
+                        currentlyAt = collectiveClusterRoute[-1]
+                        vehicleCapacityLeft = vehicleCapacity 
                 if minNodeDist == None:
-                    minNodeDist = distances[node][currentlyAt]
+                    minNodeDist = distances[currentlyAt][node]
                     closestNode = node
-                elif minNodeDist > distances[node][currentlyAt]:
-                    minNodeDist = distances[node][currentlyAt]
+                elif minNodeDist > distances[currentlyAt][node]:
+                    minNodeDist = distances[currentlyAt][node]
                     closestNode = node
 
             try:
                 totalRouteDist += minNodeDist
-                vehicleCapacityLeft -= coordinateSet.loc[coordinateSet["NodeNumber"] == closestNode]["Demand"]
+                node_demand = float(coordinateSet.loc[coordinateSet["NodeNumber"] == closestNode]["Demand"].iloc[0])
+                vehicleCapacityLeft -= node_demand
                 collectiveClusterRoute.append(closestNode)
                 clusterVisitLiao.append(closestNode)
             except:
                 pass
 
+        try:
+            if (vehicleCapacityLeft > 0.5*vehicleCapacity).any():
+                pass
+            else:
+                try: #There will be no next cluster if it is the last cluster being serviced
+                    nextClusterMP = clusterMidpoint(dataframe.loc[dataframe["NodeNumber"].isin(clusteredList[clusterOrders(clusteredList)[iterno+1]])][["X","Y"]]) #Takes time to understand yeah. Basically applies clusterMidpoint() and passes in the XY coordinate dataframe of all nodes in the NEXT cluster
+                    minVar = None
+                    for depot in depotList:
+                        if minVar == None or minVar > (anyDistance(dataframe.loc[dataframe["NodeNumber"] == currentlyAt][["X","Y"]].to_list(), dataframe.loc[dataframe["NodeNumber"] == depot][["X","Y"]].to_list()) + anyDistance(dataframe.loc[dataframe["NodeNumber"] == depot][["X","Y"]].to_list(), nextClusterMP)):
+                            minVar = anyDistance(dataframe.loc[dataframe["NodeNumber"] == currentlyAt][["X","Y"]].values.tolist(), dataframe.loc[dataframe["NodeNumber"] == depot][["X","Y"]].values.tolist()) + anyDistance(dataframe.loc[dataframe["NodeNumber"] == depot][["X","Y"]].to_list(), nextClusterMP)
+                            bestDepot = depot
+                        else:
+                            continue
+                except IndexError:
+                    continue
 
-        if (vehicleCapacityLeft > 0.5*vehicleCapacity).any():
-            pass
-        else:
-            try: #There will be no next cluster if it is the last cluster being serviced
-                nextClusterMP = clusterMidpoint(dataframe.loc[dataframe["NodeNumber"].isin(clusteredList[clusterOrders(clusteredList)[iterno+1]])][["X","Y"]]) #Takes time to understand yeah. Basically applies clusterMidpoint() and passes in the XY coordinate dataframe of all nodes in the NEXT cluster
-                minVar = None
-                for depot in depotList:
-                    if minVar == None or minVar > (anyDistance(dataframe.loc[dataframe["NodeNumber"] == currentlyAt][["X","Y"]].to_list(), dataframe.loc[dataframe["NodeNumber"] == depot][["X","Y"]].to_list()) + anyDistance(dataframe.loc[dataframe["NodeNumber"] == depot][["X","Y"]].to_list(), nextClusterMP)):
-                        minVar = anyDistance(dataframe.loc[dataframe["NodeNumber"] == currentlyAt][["X","Y"]].values.tolist(), dataframe.loc[dataframe["NodeNumber"] == depot][["X","Y"]].values.tolist()) + anyDistance(dataframe.loc[dataframe["NodeNumber"] == depot][["X","Y"]].to_list(), nextClusterMP)
-                        bestDepot = depot
-                    else:
-                        continue
-            except IndexError:
-                continue
+                vehicleCapacityLeft = vehicleCapacity
+                totalRouteDist += minVar
+                collectiveClusterRoute.append(bestDepot)
+        except:
+            if vehicleCapacityLeft > 0.5*vehicleCapacity:
+                pass
+            else:
+                try: #There will be no next cluster if it is the last cluster being serviced
+                    nextClusterMP = clusterMidpoint(dataframe.loc[dataframe["NodeNumber"].isin(clusteredList[clusterOrders(clusteredList)[iterno+1]])][["X","Y"]]) #Takes time to understand yeah. Basically applies clusterMidpoint() and passes in the XY coordinate dataframe of all nodes in the NEXT cluster
+                    minVar = None
+                    for depot in depotList:
+                        if minVar == None or minVar > (anyDistance(dataframe.loc[dataframe["NodeNumber"] == currentlyAt][["X","Y"]].to_list(), dataframe.loc[dataframe["NodeNumber"] == depot][["X","Y"]].to_list()) + anyDistance(dataframe.loc[dataframe["NodeNumber"] == depot][["X","Y"]].to_list(), nextClusterMP)):
+                            minVar = anyDistance(dataframe.loc[dataframe["NodeNumber"] == currentlyAt][["X","Y"]].values.tolist(), dataframe.loc[dataframe["NodeNumber"] == depot][["X","Y"]].values.tolist()) + anyDistance(dataframe.loc[dataframe["NodeNumber"] == depot][["X","Y"]].to_list(), nextClusterMP)
+                            bestDepot = depot
+                        else:
+                            continue
+                except IndexError:
+                    continue
 
-            vehicleCapacityLeft = vehicleCapacity
-            totalRouteDist += minVar
-            collectiveClusterRoute.append(bestDepot)
+                vehicleCapacityLeft = vehicleCapacity
+                totalRouteDist += minVar
+                collectiveClusterRoute.append(bestDepot)
 
     noiseNodes = [dataframe.iloc[index]["NodeNumber"] for index, category in enumerate(catList) if category == -1] #Wow i just realised enumerate(list) returns [(index, element)]
     if noisePoints == "Ignore":
@@ -513,8 +542,17 @@ def clusterRouted(epsilon, min_samples, noisePoints = "Address", coordinates = d
             for j in noiseNodes:
                 if j in collectiveClusterRoute:
                     continue
-                if (dataframe.loc[dataframe["NodeNumber"] == j]["Demand"].values > vehicleCapacityLeft).any():
-                    chooseReturnDepot(currentlyAt, decidedRouteWithBackTrips=collectiveClusterRoute)
+                node_demand = float(coordinateSet.loc[coordinateSet["NodeNumber"] == node]["Demand"].iloc[0])
+                try:
+                    if (node_demand > vehicleCapacityLeft).any():
+                        chooseReturnDepot(currentlyAt, decidedRouteWithBackTrips=collectiveClusterRoute)
+                        currentlyAt = collectiveClusterRoute[-1]
+                        vehicleCapacityLeft = vehicleCapacity
+                except:
+                    if node_demand > vehicleCapacityLeft:
+                        chooseReturnDepot(currentlyAt, decidedRouteWithBackTrips=collectiveClusterRoute)
+                        currentlyAt = collectiveClusterRoute[-1]
+                        vehicleCapacityLeft = vehicleCapacity
                 if minVar == None or minVar > distances[currentlyAt][j]:
                     minVar = distances[currentlyAt][j]
                     best = j
@@ -522,7 +560,8 @@ def clusterRouted(epsilon, min_samples, noisePoints = "Address", coordinates = d
                     continue
             try:
                 totalRouteDist += minVar
-                vehicleCapacityLeft -= dataframe.loc[dataframe["NodeNumber"] == best]["Demand"]
+                node_demand = float(dataframe.loc[dataframe["NodeNumber"] == best]["Demand"].iloc[0])
+                vehicleCapacityLeft -= node_demand
                 collectiveClusterRoute.append(best)
             except:
                 continue
@@ -534,7 +573,7 @@ def clusterRouted(epsilon, min_samples, noisePoints = "Address", coordinates = d
             #1) After one cluster is complete, go back to strategic depot such that currentlyAt --- depot --- next cluster is minimized. Remember to refill capacity
             #2) Choose order of clusters by nearest neighbour, but for entire cluser. ie take midpoint of all points in each cluster, then nearest neighbour the midpoints to find out cluster order
             #3) Address points that are OUTSIDE of the cluster (noise points) (the category of these points are labelled as -1) (they do not count as a category in nunique)
-            #14/6/25 --- DONE!
+            #14/6/25 --- DONE! Don't delete this, we need this for our journalling
              
 dict1 = clusterRouted(10, 4, noisePoints="Address", vehicleCapacity=vehicleCapacity)
 
@@ -564,9 +603,13 @@ print(calculate2DDistances(optimizedBacktripRoute))
 print(nodeCount)
 print(dict1)
 
+#Notes:
+
 #Challenge to have vehicles serve noise points while transiting from node to depot if on the way.
 #Challenge to try creating a k-opt algorithm? ie 2-way swap, 3-way swap, 4-way swap all customizable by an input parameter.
 
 #Color the nodes by dbscan cluster on a separate scatter plot
+
+#Hear me out guys --- I know this code structure is really stupid where there are just some try: x except: literally x with a small data tweak but its actually needed cuz for some reason sometimes python takes a 1x1 piece of data as a number, sometimes it takes it as a pandas series so i have to account for both 
 
 #Status: Working!
