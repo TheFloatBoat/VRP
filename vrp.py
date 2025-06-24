@@ -608,7 +608,8 @@ nodeLabelListofRoute = labelDepots(bestRouteNN)
 plt.figure()
 plt.plot(byDepotX, byDepotY, linestyle='--', color='gray', alpha=0.5)
 plt.scatter(byDepotX, byDepotY, c = nodeLabelListofRoute) #This does not plot the ditched points for dbscan if ignore mode
-plt.title("Path from Nearest Neighbour Algorithm")
+plt.title("Path from Nearest Neighbour Algorithm")\
+plt.figtext(0.5, 0.01,"Route Distance: %s"%calculate2DDistances(splitIntoBacktrips(depots, bestRouteNN)), horizontalalignment = "center")
 plt.show()
 
 byClusterX, byClusterY = XYSplit(dict1.get("route"))
@@ -617,6 +618,7 @@ plt.figure()
 plt.scatter(byClusterX, byClusterY, c = orderedClusterLabs) #This should be the nodes labelled in terms of classification, IN ORDER or route
 plt.plot(byClusterX, byClusterY, linestyle='--', color='gray', alpha=0.5)
 plt.title("Path from DBSCAN Unsupervised Learning")
+plt.figtext(0.5, 0.01,"Route Distance: %s"%dict1.get("distance"), horizontalalignment = "center")
 plt.show()
 
 optimizedBacktripRoute = twoOpt(backtripRoutes, 2000, "rojak")
@@ -626,6 +628,7 @@ plt.figure()
 plt.plot(twoOptedX, twoOptedY, linestyle='--', color='gray', alpha=0.5)
 plt.scatter(twoOptedX, twoOptedY, c = nodeLabelListofRoute2) #This does not plot the ditched points for dbscan if ignore mode
 plt.title("Path from Nearest Neighbour Algorithm Enhanced by Two Opt")
+plt.figtext(0.5, 0.01,"Route Distance: %s"%calculate2DDistances(optimizedBacktripRoute), horizontalalignment = "center")
 plt.show()
 
 
