@@ -603,41 +603,79 @@ def XYSplit(route):
         Y.append(dataframe.loc[dataframe["NodeNumber"] == point]["Y"])
     return X, Y
 
+import matplotlib.animation as animation
+
+def interpolate_path(x_list, y_list, steps_per_segment=30):
+    path_x, path_y = [], []
+    for i in range(len(x_list) - 1):
+        segment_x = np.linspace(x_list[i], x_list[i+1], steps_per_segment)
+        segment_y = np.linspace(y_list[i], y_list[i+1], steps_per_segment)
+        path_x.extend(segment_x)
+        path_y.extend(segment_y)
+    return path_x, path_y
+
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+import matplotlib.image as mpimg
+
+def plot_and_animate_route(x_coords, y_coords, node_labels, title, distance_text):
+    path_x, path_y = interpolate_path(x_coords, y_coords)
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.plot(x_coords, y_coords, linestyle='--', color='gray', alpha=0.5)
+    ax.scatter(x_coords, y_coords, c=node_labels, zorder=2)
+    ax.set_title(title)
+    fig.text(0.5, 0.01, distance_text, horizontalalignment="center")
+
+    car_img = mpimg.imread("C:/Users/User/OIP-removebg-preview.png")  # Make sure file is in the same folder
+    imagebox = OffsetImage(car_img, zoom=0.08)  # Adjust zoom as needed
+    car = AnnotationBbox(imagebox, (path_x[0], path_y[0]), frameon=False)
+    ax.add_artist(car)
+
+    def update(frame):
+        car.xybox = (path_x[frame], path_y[frame])
+        return car,
+
+    ani = animation.FuncAnimation(
+        fig, update, frames=len(path_x), interval=5, blit=True
+    )
+
+    plt.show()
+
+
 byDepotX, byDepotY = XYSplit(bestRouteNN)
 nodeLabelListofRoute = labelDepots(bestRouteNN)
-plt.figure()
-plt.plot(byDepotX, byDepotY, linestyle='--', color='gray', alpha=0.5)
-plt.scatter(byDepotX, byDepotY, c = nodeLabelListofRoute) #This does not plot the ditched points for dbscan if ignore mode
-plt.title("Path from Nearest Neighbour Algorithm")\
-plt.figtext(0.5, 0.01,"Route Distance: %s"%calculate2DDistances(splitIntoBacktrips(depots, bestRouteNN)), horizontalalignment = "center")
-plt.show()
+dist1 = calculate2DDistances(splitIntoBacktrips(depots, bestRouteNN))
+plot_and_animate_route(
+    byDepotX, byDepotY, nodeLabelListofRoute,
+    "Path from Nearest Neighbour Algorithm",
+    f"Route Distance: {dist1}"
+)
 
 byClusterX, byClusterY = XYSplit(dict1.get("route"))
 orderedClusterLabs = labelClusterOrder(nodeLabelsClustered)
-plt.figure()
-plt.scatter(byClusterX, byClusterY, c = orderedClusterLabs) #This should be the nodes labelled in terms of classification, IN ORDER or route
-plt.plot(byClusterX, byClusterY, linestyle='--', color='gray', alpha=0.5)
-plt.title("Path from DBSCAN Unsupervised Learning")
-plt.figtext(0.5, 0.01,"Route Distance: %s"%dict1.get("distance"), horizontalalignment = "center")
-plt.show()
+dist2 = dict1.get("distance")
+plot_and_animate_route(
+    byClusterX, byClusterY, orderedClusterLabs,
+    "Path from DBSCAN Unsupervised Learning",
+    f"Route Distance: {dist2}"
+)
 
 optimizedBacktripRoute = twoOpt(backtripRoutes, 2000, "rojak")
 twoOptedX, twoOptedY = XYSplit(twoDtooneD(optimizedBacktripRoute))
 nodeLabelListofRoute2 = labelDepots(twoDtooneD(optimizedBacktripRoute))
-plt.figure()
-plt.plot(twoOptedX, twoOptedY, linestyle='--', color='gray', alpha=0.5)
-plt.scatter(twoOptedX, twoOptedY, c = nodeLabelListofRoute2) #This does not plot the ditched points for dbscan if ignore mode
-plt.title("Path from Nearest Neighbour Algorithm Enhanced by Two Opt")
-plt.figtext(0.5, 0.01,"Route Distance: %s"%calculate2DDistances(optimizedBacktripRoute), horizontalalignment = "center")
-plt.show()
+dist3 = calculate2DDistances(optimizedBacktripRoute)
+plot_and_animate_route(
+    twoOptedX, twoOptedY, nodeLabelListofRoute2,
+    "Path from Nearest Neighbour Algorithm Enhanced by Two Opt",
+    f"Route Distance: {dist3}"
+)
 
 
-
+print(splitIntoBacktrips(depots, bestRouteNN))
 print(optimizedBacktripRoute)
 print(calculate2DDistances(optimizedBacktripRoute))
 print(nodeCount)
 print(dict1)
-
 #Notes:
 
 #Challenge to have vehicles serve noise points while transiting from node to depot if on the way.
