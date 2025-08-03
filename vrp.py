@@ -1,12 +1,11 @@
-#CSV or XLSX format: NodeNumber (MUST be unique for every single node), NodeType(e.g. 0 for depot 1 for customer), X, Y, Demand
-#Use Euclidean distances for now
-
-
-##VRP Solver!
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.cluster import DBSCAN
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+import matplotlib.image as mpimg
+import matplotlib.animation as animation
+
 print("VRP Solver!")
 dataframe = pd.read_csv("C:/Users/User/VRPNodes115.csv")
 
@@ -277,7 +276,35 @@ def splitIntoBacktrips(depots, route,lastChopped=0, itercounter=-1): #ky is addi
     route.insert(0,addback2)
     return backtripRoutes
 
-
+def splitIntoBacktrips_fixed(depots, route, lastChopped=0, itercounter=-1):
+    backtripRoutes = []
+    addback = route[-1]
+    addback2 = route[0]
+    del route[-1]
+    del route[0]
+    
+    depotList = [x for x in range(0, len(depots))]
+    
+    for node in route:
+        itercounter += 1
+        if int(node) in depotList:
+            backtripRoutes.append(route[lastChopped:itercounter+1])
+            lastChopped = itercounter
+    
+    route.append(addback)
+    backtripRoutes.append(route[lastChopped:])
+    
+    # DON'T SKIP SEGMENTS - keep all of them
+    # Remove the filtering logic that was causing nodes to be lost
+    
+    # Add back the first node to the first segment
+    if len(backtripRoutes) > 0:
+        backtripRoutes[0] = [addback2] + backtripRoutes[0]
+    
+    # Restore the original route
+    route.insert(0, addback2)
+    
+    return backtripRoutes
 #Status: FINALLY WORKING OMGS
 
 
@@ -291,6 +318,8 @@ print(backtripRoutes)
 def intraRoute(backTripRoute, n_iterations = 1000):
     global bestRoute
     for i in range(n_iterations):
+            if len(backTripRoute) <3:
+                continue
             initialDist, initial1D = calculate2DDistances(backTripRoute, return1D = "True")
             backTripRouteCopy = [trip.copy() for trip in backTripRoute] #Damn --- i never knew that .copy() on a 2D list only creates a copy of the outer list, inner lists are still shared. this is known as a shallow copy (vs deep copy as done here)
             randomNumber = np.random.randint(1, 10*len(backTripRoute))
@@ -576,7 +605,7 @@ def clusterRouted(epsilon, min_samples, noisePoints = "Address", coordinates = d
             #3) Address points that are OUTSIDE of the cluster (noise points) (the category of these points are labelled as -1) (they do not count as a category in nunique)
             #14/6/25 --- DONE! Don't delete this, we need this for our journalling
              
-dict1, nodeLabelsClustered = clusterRouted(10, 4, noisePoints="Address", vehicleCapacity=vehicleCapacity)
+dict1, nodeLabelsClustered = clusterRouted(10, 4, noisePoints="Ignore", vehicleCapacity=vehicleCapacity)
 
 #Plotting out route using matplotlib
 def labelClusterOrder(labelsUnordered, dict1= dict1):
@@ -603,8 +632,6 @@ def XYSplit(route):
         Y.append(dataframe.loc[dataframe["NodeNumber"] == point]["Y"])
     return X, Y
 
-import matplotlib.animation as animation
-
 def interpolate_path(x_list, y_list, steps_per_segment=30):
     path_x, path_y = [], []
     for i in range(len(x_list) - 1):
@@ -613,9 +640,6 @@ def interpolate_path(x_list, y_list, steps_per_segment=30):
         path_x.extend(segment_x)
         path_y.extend(segment_y)
     return path_x, path_y
-
-from matplotlib.offsetbox import OffsetImage, AnnotationBbox
-import matplotlib.image as mpimg
 
 def plot_and_animate_route(x_coords, y_coords, node_labels, title, distance_text):
     path_x, path_y = interpolate_path(x_coords, y_coords)
@@ -626,7 +650,7 @@ def plot_and_animate_route(x_coords, y_coords, node_labels, title, distance_text
     ax.set_title(title)
     fig.text(0.5, 0.01, distance_text, horizontalalignment="center")
 
-    car_img = mpimg.imread("C:/Users/User/OIP-removebg-preview.png")  # Make sure file is in the same folder
+    car_img = mpimg.imread("C:/Users/User/Downloads/Adobe Express - file.png")  # Make sure file is in the same folder
     imagebox = OffsetImage(car_img, zoom=0.08)  # Adjust zoom as needed
     car = AnnotationBbox(imagebox, (path_x[0], path_y[0]), frameon=False)
     ax.add_artist(car)
@@ -640,7 +664,6 @@ def plot_and_animate_route(x_coords, y_coords, node_labels, title, distance_text
     )
 
     plt.show()
-
 
 byDepotX, byDepotY = XYSplit(bestRouteNN)
 nodeLabelListofRoute = labelDepots(bestRouteNN)
@@ -670,12 +693,23 @@ plot_and_animate_route(
     f"Route Distance: {dist3}"
 )
 
+allIntegratedRoute = twoOpt(twoOpt(twoOpt(splitIntoBacktrips_fixed(depots,dict1.get("route")), 7000, "rojak"), 8000, "inter_route"), 1000, "intra_route")
+allIntegratedX, allIntegratedY = XYSplit(twoDtooneD(allIntegratedRoute))
+nodeLabelListofRoute3 = labelDepots(twoDtooneD(allIntegratedRoute))
+dist4 = calculate2DDistances(allIntegratedRoute)
+plot_and_animate_route(
+    allIntegratedX, allIntegratedY, nodeLabelListofRoute3,
+    "Integrated Solution",
+    f"Route Distance: {dist4}"
+)
 
 print(splitIntoBacktrips(depots, bestRouteNN))
 print(optimizedBacktripRoute)
 print(calculate2DDistances(optimizedBacktripRoute))
 print(nodeCount)
 print(dict1)
+
+
 #Notes:
 
 #Challenge to have vehicles serve noise points while transiting from node to depot if on the way.
@@ -684,5 +718,5 @@ print(dict1)
 #Color the nodes by dbscan cluster on a separate scatter plot --- DONE!
 
 #Hear me out guys --- I know this code structure is really stupid where there are just some try: x except: literally x with a small data tweak but its actually needed cuz for some reason sometimes python takes a 1x1 piece of data as a number, sometimes it takes it as a pandas series so i have to account for both 
-
+#Animation done by ChatGPT LOL :)
 #Status: Working!
