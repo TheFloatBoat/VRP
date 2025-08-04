@@ -521,7 +521,7 @@ def clusterRouted(epsilon, min_samples, noisePoints = "Address", coordinates = d
                 pass
 
         try:
-            if (vehicleCapacityLeft > 0.5*vehicleCapacity).any():
+            if (vehicleCapacityLeft > 0.2*vehicleCapacity).any():
                 pass
             else:
                 try: #There will be no next cluster if it is the last cluster being serviced
@@ -605,7 +605,7 @@ def clusterRouted(epsilon, min_samples, noisePoints = "Address", coordinates = d
             #3) Address points that are OUTSIDE of the cluster (noise points) (the category of these points are labelled as -1) (they do not count as a category in nunique)
             #14/6/25 --- DONE! Don't delete this, we need this for our journalling
              
-dict1, nodeLabelsClustered = clusterRouted(10, 4, noisePoints="Ignore", vehicleCapacity=vehicleCapacity)
+dict1, nodeLabelsClustered = clusterRouted(8, 4, noisePoints="Address", vehicleCapacity=vehicleCapacity)
 
 #Plotting out route using matplotlib
 def labelClusterOrder(labelsUnordered, dict1= dict1):
@@ -703,12 +703,17 @@ plot_and_animate_route(
     f"Route Distance: {dist4}"
 )
 
+print("Nearest Neighbour Path:")
 print(splitIntoBacktrips(depots, bestRouteNN))
+print("\n___________________\n")
+print("Two-Opted Nearest Neighbour Path:")
 print(optimizedBacktripRoute)
-print(calculate2DDistances(optimizedBacktripRoute))
-print(nodeCount)
+print("\n___________________\n")
+print("DBSCAN Path:")
 print(dict1)
-
+print("\n___________________\n")
+print("Integrated Solution Path:")
+print(allIntegratedRoute)
 
 #Notes:
 
