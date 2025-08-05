@@ -8,10 +8,24 @@ depotCount = len(nodes.loc[nodes["NodeType"] == 0])
 
 #Just find the average distance between nodes n(i) and n(i+1)
 
+capacity = 50
+capacityLeft = capacity
 routeDist = 0
 ncolumns, nrows = distances.shape
 
+
 for i in range(nrows-1):
-        routeDist += distances.iloc[i,i+1]
+        i += depotCount
+        try:
+                if capacityLeft < nodes.iloc[i, 4]:
+                        routeDist += distances.iloc[i, 0]
+                        routeDist += distances.iloc[0, i+1]
+                        capacityLeft = capacity - nodes.iloc[i,4]
+                        continue
+                routeDist += distances.iloc[i,i+1]
+                capacityLeft -= nodes.iloc[i,4]
+        except:
+                break
+
 
 print(int(routeDist))
