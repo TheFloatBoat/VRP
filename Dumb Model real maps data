@@ -1,0 +1,17 @@
+import pandas as pd
+import numpy as np
+
+distances = pd.read_csv("C:/Users/User/Downloads/newDistanceMatrix (1).csv", header = None)
+nodes = pd.read_csv("C:/Users/User/Downloads/random_25_locations_FORMATTED.csv")
+
+depotCount = len(nodes.loc[nodes["NodeType"] == 0])
+
+#Just find the average distance between nodes n(i) and n(i+1)
+
+routeDist = 0
+ncolumns, nrows = distances.shape
+
+for i in range(nrows-1):
+        routeDist += distances.iloc[i,i+1]
+
+print(int(routeDist))
