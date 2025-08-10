@@ -1,0 +1,118 @@
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
+r = pd.DataFrame({"Capacity":["100","130","inf"],"NN": [7.18,5.22,5.68], "NN+2O":[6.45,5.09,5.54],"DBSCANA":[9.95,7.95,9.00],"DBSCANI":[10.38,9.06,9.12],"Integrated":[10.19,7.68,7.75],"Dumb":[17.63,18.04,17.00]})
+h =pd.DataFrame({"Capacity":["100","130","inf"],"NN":[4.55,4.30,3.99],"NN+2O":[4.42,4.30,3.99],"DBSCANA":[10.01,10.10,11.21],"DBSCANI":[6.28,6.14,5.09],"Integrated":[5.79,5.55,5.00],"Dumb":[26.67,25.69,23.84]})
+
+def avgOfAvg(r,h):
+    rAvg = r.drop(columns=["Capacity"]).mean()
+    rAvg = pd.DataFrame(rAvg).transpose()
+    hAvg = h.drop(columns=["Capacity"]).mean()
+    hAvg = pd.DataFrame(hAvg).transpose()
+    avgTable = pd.concat([rAvg,hAvg],axis =0)
+    avgTable["Data"] = ["Real","Hypothetical"]
+    avgavg = avgTable.drop(columns=["Data"]).mean().to_list()
+    return avgTable, avgavg
+
+avgTable, avgavg = avgOfAvg(r,h)
+colsList = avgTable.columns.to_list()
+colsList.pop(-1)
+
+def barPlot():
+    alist = np.array([x for x in range(len(colsList))])
+    plt.bar(alist+0.4/2, avgTable.iloc[0,:6].to_list(), width = 0.4, label = "Real Dataset")
+    plt.bar(alist-0.4/2, avgTable.iloc[1,:6].to_list(), width = 0.4, label = "Hypothetical Dataset")
+    plt.xticks(alist, colsList)
+    plt.xlabel("Model")
+    plt.ylabel("Average Distance Per Node")
+    plt.legend()
+    plt.show()
+
+barPlot()
+
+def scatterLine():
+    consol = pd.concat([r,h]) #Scatter points are to be colored by model
+    cListR = [] #This list is for coloring. Thus will contain column names in respective order
+    distListR = [] #This is the y- value
+    capListR = [] #This is the x- value
+    cListH = []
+    distListH = []
+    capListH = []
+    for index, row in consol.head(len(consol["Capacity"].unique())).iterrows():
+        for i in range(len(row)):
+            if i ==0:
+                continue
+            else:
+                distListR.append(row[i])
+                cListR.append(colsList[i-1])
+                capListR.append(row[0])
+                
+    for index, row in consol.tail(len(consol["Capacity"].unique())).iterrows():
+        for i in range(len(row)):
+            if i ==0:
+                continue
+            else:
+                distListH.append(row[i])
+                cListH.append(colsList[i-1])
+                capListH.append(row[0])
+
+    colorMap = {"NN":"red","NN+2O":"green","DBSCANA":"blue","DBSCANI":"yellow", "Integrated":"brown","Dumb":"pink"}
+    cListR = [colorMap[i] for i in cListR]
+    cListH = [colorMap[i] for i in cListH]
+
+    import matplotlib.pyplot as plt
+    import pandas as pd
+
+    # Invert colorMap to map color back to model name
+    invColorMap = {v: k for k, v in colorMap.items()}
+
+    # Create DataFrames for real and hypothetical data
+    df_real = pd.DataFrame({
+        'Capacity': capListR,
+        'Distance': distListR,
+        'Color': cListR
+    })
+    df_real['Model'] = df_real['Color'].map(invColorMap)
+
+    df_hypo = pd.DataFrame({
+        'Capacity': capListH,
+        'Distance': distListH,
+        'Color': cListH
+    })
+    df_hypo['Model'] = df_hypo['Color'].map(invColorMap)
+
+    # Compute average distance by Capacity and Model for both datasets
+    avg_real = df_real.groupby(['Capacity', 'Model'])['Distance'].mean().reset_index()
+    avg_hypo = df_hypo.groupby(['Capacity', 'Model'])['Distance'].mean().reset_index()
+
+    # Merge real and hypothetical averages on Capacity and Model
+    avg_combined = pd.merge(
+        avg_real, avg_hypo,
+        on=['Capacity', 'Model'],
+        suffixes=('_real', '_hypo'),
+        how='outer'
+    ).fillna(0)  # fill NaNs with 0 or you can choose another fill method
+
+    # Calculate average distance of real and hypothetical
+    avg_combined['Distance_avg'] = (avg_combined['Distance_real'] + avg_combined['Distance_hypo']) / 2
+
+    # Plot scatter points
+    plt.scatter(capListR, distListR, c=cListR, marker='o', alpha=0.5, label='Real Dataset')
+    plt.scatter(capListH, distListH, c=cListH, marker='x', alpha=0.5, label='Hypothetical Dataset')
+
+    # Plot one trend line per model with combined averages
+    for model, color in colorMap.items():
+        subset = avg_combined[avg_combined['Model'] == model].sort_values('Capacity')
+        plt.plot(subset['Capacity'], subset['Distance_avg'], color=color, label=f"{model} Trend")
+
+    # Create legend for colors only (models)
+    import matplotlib.patches as mpatches
+    legend_handles = [mpatches.Patch(color=color, label=model) for model, color in colorMap.items()]
+    plt.legend(handles=legend_handles, title='Model', bbox_to_anchor=(1.05, 1), loc='upper left')
+
+    plt.xlabel('Capacity')
+    plt.ylabel('Average Distance Per Node')
+    plt.title('Distance vs Capacity with Model Average Trends')
+    plt.tight_layout()
+    plt.show()
+
