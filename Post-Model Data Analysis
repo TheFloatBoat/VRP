@@ -30,7 +30,9 @@ def barPlot():
 
 barPlot()
 
-def scatterLine():
+def scatterLine(r, h):
+    import matplotlib.pyplot as plt
+    import pandas as pd #Somehow i have to import this again here?
     consol = pd.concat([r,h]) #Scatter points are to be colored by model
     cListR = [] #This list is for coloring. Thus will contain column names in respective order
     distListR = [] #This is the y- value
@@ -72,6 +74,7 @@ def scatterLine():
         'Distance': distListR,
         'Color': cListR
     })
+
     df_real['Model'] = df_real['Color'].map(invColorMap)
 
     df_hypo = pd.DataFrame({
@@ -112,7 +115,17 @@ def scatterLine():
 
     plt.xlabel('Capacity')
     plt.ylabel('Average Distance Per Node')
-    plt.title('Distance vs Capacity with Model Average Trends')
+    meanCapDF = consol.groupby("Capacity").mean()
+    meansList = []
+    for index, row in meanCapDF.iterrows():
+        nCols = len(row)
+        currentAvg = 0
+        for i in range(nCols):
+            currentAvg += row[i]
+        meansList.append(currentAvg/nCols)
+    plt.bar([0,1,2], meansList, width = 0.5, alpha = 0.3)
+    plt.title('Relationship between Distance and Capacity across Models')
     plt.tight_layout()
     plt.show()
 
+scatterLine(r,h)
