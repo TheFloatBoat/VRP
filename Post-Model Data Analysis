@@ -129,3 +129,31 @@ def scatterLine(r, h):
     plt.show()
 
 scatterLine(r,h)
+
+
+dfall["OpExtent"] = ((dfall["NN"] - dfall["NN+2O"])/dfall["NN"])*100
+r["OpExtent"] = ((r["NN"] - r["NN+2O"])/r["NN"])*100
+h["OpExtent"] = ((h["NN"] - h["NN+2O"])/h["NN"])*100
+opPCTlist = dfall.groupby("Capacity")["OpExtent"].mean()
+opPCTlistr = r.groupby("Capacity")["OpExtent"].mean()
+opPCTlisth = h.groupby("Capacity")["OpExtent"].mean()
+plt.plot([0, 1, 2], opPCTlist, marker='o', c= "red", alpha = 0.6)
+
+
+for xi, yi in zip([0, 1, 2], opPCTlist):
+    plt.text(
+        xi, yi + 0.2,      
+        f"{yi:.2f}", 
+        ha='center', va='bottom'
+    )
+
+plt.xticks([0,1,2],["100","130","inf"])
+plt.bar(np.array([0,1,2]) + 0.2, opPCTlisth, width = 0.4, label = "Hypothetical Dataset", alpha = 0.8)
+plt.bar(np.array([0,1,2]) - 0.2, opPCTlistr, width = 0.4, label = "Real-World Dataset", alpha = 0.8)
+
+plt.ylim(top=12)
+plt.xlabel("Capacity")
+plt.ylabel("% Optimization by Two-Opt")
+plt.title("Relationship between Capacity and Extent of Optimization")
+plt.legend()
+plt.show()
