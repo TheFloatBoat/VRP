@@ -1,7 +1,5 @@
-# VRP
-Vehicle routing problem
+# Simulation and Charting Tool for Various Heuristics in Solving the Vehicle Routing Problem
 
-API-friendly code on Google Collab:
-https://colab.research.google.com/drive/1Q2nkAdPJMrqXoTijuOZDwKnN_qezVT15
+The Python-based code in this repository is for a simulation tool of optimal routes through which a vehicle with a limited capacity can traverse for a given set of nodes and depots.
 
-Coefficient to scale hypothetical data unit such that it is comparable to that of the real world dataset is approximately (1/2.0948)
+Included in the code are some pre-built heuristics for route-crafting. However these are merely basic heuristics such us Nearest Neighbour Routing, Two-Opt, and visits based on Density-Based Clustering.
